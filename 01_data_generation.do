@@ -16,6 +16,11 @@ save nhanes_demo_exam_ques, replace
 // tab year_start _merge
 
 // subset to 1999-2009
+/* Turned off 
+    Leave the subset part to variable cleaning to allow different outcomes
+*/
+
+/*
 keep if year_start <= 2009
 
 save nhanes_2009, replace
@@ -24,6 +29,6 @@ use nhanes_2009, clear
 
 keep seqn rhq551b ssq010 ssd011 ssq011 ssd031 ssq030 ssq031 ciqd* cidd* ciqg* cidg* ciqp* cidp* dpq* year_start
 save nhanes_2009_mental, replace
-
+*/
 
 

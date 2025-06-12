@@ -24,7 +24,7 @@ qui {
 
     if 2 {
         // loading the dataset
-        use "nhanes_2009_cleaned", clear
+        use "nhanes_2007_support", clear
     }
 
     if 3 {
@@ -616,7 +616,7 @@ qui {
         capture cd "${output_folder}tables"
         if 5.1 {
             // table 1
-            noi table1_fena, var(support emo_support depression age race gender education bmi hs hypertension diabete survey) by(stroke) missingness title("Table 1: Participants Characteristics By Stroke History At Survey For NHANES 1999-2008") excel("table1.xlsx")
+            noi table1_fena, var(support emo_support age race gender education bmi hs hypertension diabete survey) by(stroke) missingness title("Table 1: Participants Characteristics By Stroke History At Survey For NHANES 1999-2008") excel("table1_support.xlsx")
         }
 		if 5.2 {
 			// table 1 for only have support persons
@@ -626,7 +626,7 @@ qui {
 			noi di "Creating Table 1 For Those Answered Support Question"
 			keep if !missing(support)
 			noi di "`mis_n' person dropped"
-			noi table1_fena, var(support emo_support age race gender education bmi hs hypertension diabete survey) by(stroke) missingness title("Table 1: Participants Characteristics By Stroke History At Survey For NHANES 1999-2008") excel("table1_support.xlsx")
+			noi table1_fena, var(support emo_support age race gender education bmi hs hypertension diabete survey) by(stroke) missingness title("Table 1: Participants Characteristics By Stroke History At Survey For NHANES 1999-2008") excel("table1_support_only.xlsx")
 			restore
 		}
 		capture cd "${root}"
@@ -1059,4 +1059,85 @@ qui {
 			capture cd "${root}"
         }
 	}
+
+    if 7 {
+        // now move to depression analysis
+        if 7.1 {
+            // load in depression dataset
+            use "nhanes_2018_depression.dta", clear
+        }
+
+        if 7.2 {
+            // table 1 creation
+            // some basic statistics
+            capture cd "${output_folder}tables"
+            if 5.1 {
+                // table 1
+                noi table1_fena, var(depression depression_type age race gender education bmi hs hypertension diabete survey) by(stroke) missingness title("Table 1: Participants Characteristics By Stroke History At Survey For NHANES 2005-2018") excel("table1_depression.xlsx")
+            }
+            if 5.2 {
+                // table 1 for only have support persons
+                preserve
+                qui count if missing(depression)
+                local mis_n = `r(N)'
+                noi di "Creating Table 1 For Those Answered Depression Question"
+                keep if !missing(depression)
+                noi di "`mis_n' person dropped"
+                noi table1_fena, var(depression depression_type age race gender education bmi hs hypertension diabete survey) by(stroke) missingness title("Table 1: Participants Characteristics By Stroke History At Survey For NHANES 2005-2018") excel("table1_depression_only.xlsx")
+                restore
+            }
+            capture cd "${root}"
+        }
+
+        if 7.3 {
+            // regression for depression
+            capture cd "${output_folder}tables"
+            preserve
+            keep if !missing(depression)
+            local dep_vars
+            foreach i in `vars' {
+                if (strpos("`i'", "emo_") == 0) {
+                    local dep_vars `dep_vars' `i'
+                }
+            }
+            noi logit depression i.stroke `dep_vars', or
+            
+            matrix log_mt = r(table)'
+			local depression_n = `e(N)'
+			
+			putexcel set logit_depression_or, replace
+			
+			putexcel A1 = matrix(log_mt), names
+
+            local table2_vars : di subinstr("`dep_vars'", "i.", "", .)
+            // now the table2 program should take the following arguments:
+            // out: support
+            // exp: stroke
+            // exp_type: 1 (binary)
+            // var: `table2_vars'
+            // mat: log_mt
+            // n: `support_n'
+            // title: "Table 2: Adjusted Prevalence Odds Ratios For Needing More Emotional Support In The Past 12 Months By Stroke History For NHANES Population 1999-2008"
+            // excel: "table2_support.xlsx"
+            // make sure we are in the proper directory
+            capture cd "${output_folder}tables"
+            noi table2, out(depression) exp(stroke) exp_type(1) var(`table2_vars') mat(log_mt) n(`depression_n') title("Table 2: Adjusted Prevalence Odds Ratios For Having PHQ-9 Score Above 4 By Stroke History For NHANES Population 2005-2018") excel("table2_depression.xlsx") decimal(2)
+			
+
+            // regression for depression type
+            // only outcome changed - vars were the same
+            noi ologit depression_type i.stroke `dep_vars', or
+            matrix log_mt = r(table)'
+            local depression_n = `e(N)'
+
+            putexcel set ologit_depression_type_or, replace
+            putexcel A1 = matrix(log_mt), names
+
+            capture cd "${output_folder}tables"
+            noi table2, out(depression_type) exp(stroke) exp_type(1) var(`table2_vars') mat(log_mt) n(`depression_n') title("Table 2: Adjusted Prevalence Odds Ratios For Stroke Severity Determined Through PHQ-9 Score By Stroke History For NHANES Population 2005-2018") excel("table2_depression_type.xlsx") decimal(2)
+
+            restore
+			capture cd "${root}"
+        }
+    }
 }

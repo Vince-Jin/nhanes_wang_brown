@@ -22,7 +22,7 @@ qui {
 		cd "${root}"
 
 		// loading the data
-		use nhanes_2009, clear
+		use nhanes_demo_exam_ques, clear
 	}
 
 	if 3 {
@@ -290,17 +290,72 @@ qui {
                     3 - Nearly every day
                 *** currently, all patients with dpq020 > 0 were considered as yes ***
             */
+			/*
+			Disregard previous information.
+			DPQ is more available in later years from year 2005 and later
+			the whole DPQ is a PHQ-9 test
+			for each varaible: DPQ010-DPQ090:
+			0 - Not at all - score 0
+			1 - Several days - score 1
+			2 - More than half the days - score 2
+			3 - Nearly day - score 3
+			7/9/. - Missing
+
+			Sum all these info together to get the total score
+			0-4: No depression
+			5-9: Mild depression
+			10-14: Moderate depression
+			15-19: Moderately severe depression
+			>=20: Severe depression
+
+			Besides these categories, establish a new var to be binary, classifying all above normal as depressive
+			depression:
+			0 - No
+			1 - Yes
+			*/
+			capture drop dpq_score
+			gen dpq_score = .
+			replace dpq_score = dpq010 + dpq020 + dpq030 + dpq040 + dpq050 + dpq060 + dpq070 + dpq080 + dpq090
+			label variable dpq_score "Depression Score"
+
             capture drop depression
             gen depression = .
-            replace depression = 1 if inrange(dpq020, 2, 4) | ciqd001 == 1
-            replace depression = 0 if inlist(dpq020, 1) | ciqd001 == 2
+            replace depression = 1 if !missing(dpq_score) & dpq_score >= 5
+			replace depression = 0 if inrange(dpq_score, 0, 5)
 
             capture label drop depression
             label define depression 0 "No" 1 "Yes"
             label variable depression "Depression"
             label values depression depression
+
+			// add in an variable to indicate depression type
+			capture drop depression_type
+			gen depression_type = .
+			replace depression_type = 0 if dpq_score >= 0 & dpq_score < 5
+			replace depression_type = 1 if dpq_score >= 5 & dpq_score < 10
+			replace depression_type = 2 if dpq_score >= 10 & dpq_score < 15
+			replace depression_type = 3 if dpq_score >= 15 & dpq_score < 20
+			replace depression_type = 4 if dpq_score >= 20 & !missing(dpq_score)
+			label variable depression_type "Depression Type"
+
+			capture label drop depression_type
+			label define depression_type 0 "No Depression" 1 "Mild Depression" 2 "Moderate Depression" 3 "Moderately Severe Depression" 4 "Severe Depression"
+			label values depression_type depression_type
         }
 	}
 	drop bpxsar_helper bpxdar_helper
-	noi save nhanes_2009_cleaned, replace
+
+	if 4 {
+		// saving proper dataset
+		preserve
+		keep if survey < 2009
+		noi save nhanes_2007_support, replace
+		restore
+
+		preserve
+		keep if survey >= 2005
+		noi save nhanes_2018_depression, replace
+		restore
+	}
+	
 }
